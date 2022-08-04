@@ -35,7 +35,7 @@ func main() {
 
 	var sO Opts
 
-	flag.BoolVar(&sO.IncludeSpamMsgs, "s", false, "don't skip spam messages (where X-Spam-Flag == YES)")
+	flag.BoolVar(&sO.IncludeSpamMsgs, "s", false, "process spam messages (where X-Spam-Flag == YES)")
 	flag.BoolVar(&sO.Verbose, "v", false, "verbose")
 
 	var dbInFile, dbOutFile, szExcludesFile string
