@@ -206,7 +206,7 @@ OPTIONS
 			"1;92m",
 			"SCAN COMPLETE",
 			fmt.Sprintf(
-				"SCANNED %d ADDRS IN %d MSGS; %d NEW ADDRS FOUND",
+				"SCANNED %d ADDRS IN %d MSGS; %d NEW UNIQUE ADDRS FOUND",
 				sO.nScannedAddrs,
 				nScannedMsgs,
 				sO.nNewAddrs,
