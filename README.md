@@ -16,25 +16,34 @@ A file of exclude regexes can be specified with the `-e` option.
 One regexp per line, each applied to the `[E-MAIL]` part only.
 If this file is specified but does not exist, it will be created & populated with sane defaults.
 
+## Installation
+
+1. Install the latest Go compiler from https://golang.org/dl/
+2. Install the program:
+
+```sh
+go install github.com/BourgeoisBear/maildir2addr@latest
+```
+
 ## Usage
 
 ```sh
 
-maildir2addr [flags] [maildir_path]+
+maildir2addr [OPTION...] [MAILDIR_PATH...]
 
-[flags]
+OPTIONS
 
   -e string
         address exclusion regex file [one per line]
-         (default "$HOME/.local/share/maildir2addr/excludes.regexp")
+         (default "/home/jstewart/.local/share/maildir2addr/excludes.regexp")
   -i string
         address database input file
-         (default "$HOME/.local/share/maildir2addr/addrs.tsv")
+         (default "/home/jstewart/.local/share/maildir2addr/addrs.tsv")
   -o string
         address database output file
-         (default "$HOME/.local/share/maildir2addr/addrs.tsv")
+         (default "/home/jstewart/.local/share/maildir2addr/addrs.tsv")
   -s    process spam messages (where X-Spam-Flag == YES)
-  -v    verbose
+  -v    verbose, log details to STDERR
 
 ```
 
