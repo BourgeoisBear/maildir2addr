@@ -19,7 +19,11 @@ If this file is specified but does not exist, it will be created & populated wit
 ## Usage
 
 ```sh
-Usage of maildir2addr:
+
+maildir2addr [flags] [maildir_path]+
+
+[flags]
+
   -e string
         address exclusion regex file [one per line]
          (default "$HOME/.local/share/maildir2addr/excludes.regexp")
