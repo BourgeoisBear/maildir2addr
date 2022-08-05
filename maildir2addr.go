@@ -31,8 +31,6 @@ func main() {
 
 	}()
 
-	// TODO: installation notes
-
 	const SZ_HELP_PREFIX = `
 maildir2addr
 ------------
