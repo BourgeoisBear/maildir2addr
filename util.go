@@ -23,9 +23,9 @@ type Opts struct {
 
 	nNewAddrs     int
 	nScannedAddrs int
-	nScannedMsgs  int
 
-	byAddr map[string]*mail.Address
+	// map[e-mail addr](e-mail alias/name)
+	byAddr map[string]string
 	rxExcl []*regexp.Regexp
 }
 
@@ -37,7 +37,7 @@ func init() {
 
 	pRxYes = regexp.MustCompile(`(?i)y(?:es)?`)
 	pRxQuote = regexp.MustCompile(`^'(.*)'$`)
-	bIsTty = isatty.IsTerminal(os.Stdout.Fd())
+	bIsTty = isatty.IsTerminal(os.Stderr.Fd())
 }
 
 /* -------------------------- UTILS -------------------------- */
@@ -76,7 +76,7 @@ func (sO *Opts) LogVerbose(esc, szTitle string, sParams ...string) (int, error) 
 	}
 
 	return Flog(
-		os.Stdout,
+		os.Stderr,
 		esc,
 		szTitle,
 		sParams...,
@@ -116,7 +116,7 @@ func (sO *Opts) ExcludesReadFromFile(path string) error {
 
 func (sO *Opts) AddrsPurgeExcluded() {
 
-	if (sO.byAddr == nil) || (len(sO.rxExcl) == 0) {
+	if len(sO.rxExcl) == 0 {
 		return
 	}
 
@@ -134,9 +134,15 @@ func (sO *Opts) AddrsPurgeExcluded() {
 				)
 
 				delete(sO.byAddr, addr)
+				sO.nNewAddrs -= 1
 				break
 			}
 		}
+	}
+
+	// CLAMP TO 0 IN CASE OF NEW EXCLUDES ON OLD DB
+	if sO.nNewAddrs < 0 {
+		sO.nNewAddrs = 0
 	}
 
 	return
@@ -148,10 +154,6 @@ func (sO *Opts) AddrsReadFromFile(fname string) error {
 
 	if len(fname) == 0 {
 		return nil
-	}
-
-	if sO.byAddr == nil {
-		sO.byAddr = make(map[string]*mail.Address)
 	}
 
 	pF, E := os.Open(fname)
@@ -185,16 +187,10 @@ func (sO *Opts) AddrsRead(iRdr io.Reader) error {
 		if len(line) > 0 {
 
 			sP := strings.Split(line, "\t")
-			if len(sP) > 0 {
-
-				pA := new(mail.Address)
-				pA.Address = norml(sP[0])
-
-				if len(sP) > 1 {
-					pA.Name = norml(sP[1])
-				}
-
-				sO.byAddr[pA.Address] = pA
+			if len(sP) > 1 {
+				sO.addrInsUpd(sP[0], sP[1])
+			} else if len(sP) > 0 {
+				sO.addrInsUpd(sP[0], "")
 			}
 		}
 
@@ -210,6 +206,45 @@ func (sO *Opts) AddrsRead(iRdr io.Reader) error {
 	return nil
 }
 
+/*
+	RETURNS:
+		true -> existing (update)
+		false -> new (insert)
+*/
+func (sO *Opts) addrInsUpd(addr, name string) bool {
+
+	if sO.byAddr == nil {
+		sO.byAddr = make(map[string]string)
+	}
+
+	// NORMALIZE
+	addr = norml(addr)
+	name = strings.TrimSpace(name)
+
+	// UNQUOTE NAME
+	if len(name) > 0 {
+
+		sMtch := pRxQuote.FindStringSubmatch(name)
+		if len(sMtch) > 1 {
+			name = sMtch[1]
+		}
+	}
+
+	// INSERT/UPDATE
+	namePrev, bFound := sO.byAddr[addr]
+
+	if !bFound {
+
+		sO.byAddr[addr] = name
+
+	} else if (len(namePrev) == 0) && (len(name) > 0) {
+
+		sO.byAddr[addr] = name
+	}
+
+	return bFound
+}
+
 // Writes address database in *Opts to an io.Writer
 func (sO *Opts) AddrsWrite(iWri io.Writer) error {
 
@@ -220,13 +255,13 @@ func (sO *Opts) AddrsWrite(iWri io.Writer) error {
 	pWri := bufio.NewWriterSize(iWri, 64*1024)
 
 	// WRITE ADDRESSES
-	for _, pA := range sO.byAddr {
+	for addr, name := range sO.byAddr {
 
-		pWri.WriteString(pA.Address)
+		pWri.WriteString(addr)
 
-		if len(pA.Name) > 0 {
+		if len(name) > 0 {
 			pWri.WriteString("\t")
-			pWri.WriteString(pA.Name)
+			pWri.WriteString(name)
 		}
 
 		pWri.WriteString("\n")
@@ -235,11 +270,9 @@ func (sO *Opts) AddrsWrite(iWri io.Writer) error {
 	return pWri.Flush()
 }
 
-// Moves address database to file located at `fname`
-// Contents are fully replaced
 func (sO *Opts) AddrsWriteToFile(fname string) error {
 
-	if (len(fname) == 0) || (len(sO.byAddr) == 0) {
+	if len(fname) == 0 {
 		return nil
 	}
 
@@ -277,7 +310,12 @@ func (sO *Opts) ScanMsgsForAddrs(fname string) (E error) {
 	if E != nil {
 		return
 	}
-	defer pF.Close()
+	defer func() {
+		EC := pF.Close()
+		if E == nil {
+			E = EC
+		}
+	}()
 
 	// READ MIME HEADERS
 	pRdr := bufio.NewReaderSize(pF, 64*1024)
@@ -307,10 +345,6 @@ func (sO *Opts) ScanMsgsForAddrs(fname string) (E error) {
 				return
 			}
 		}
-	}
-
-	if sO.byAddr == nil {
-		sO.byAddr = make(map[string]*mail.Address)
 	}
 
 	var mimeDec mime.WordDecoder
@@ -351,18 +385,6 @@ func (sO *Opts) ScanMsgsForAddrs(fname string) (E error) {
 
 				sO.nScannedAddrs += 1
 
-				addr.Address = norml(addr.Address)
-				addr.Name = strings.TrimSpace(addr.Name)
-
-				// UNQUOTE NAME
-				if len(addr.Name) > 0 {
-
-					sMtch := pRxQuote.FindStringSubmatch(addr.Name)
-					if len(sMtch) > 1 {
-						addr.Name = sMtch[1]
-					}
-				}
-
 				sO.LogVerbose(
 					"1;36m",
 					"\t"+key,
@@ -370,12 +392,9 @@ func (sO *Opts) ScanMsgsForAddrs(fname string) (E error) {
 					addr.Name,
 				)
 
-				pPrev := sO.byAddr[addr.Address]
-				if pPrev == nil {
-					sO.byAddr[addr.Address] = addr
+				// UPDATE INSERT COUNT FOR NEW ITEMS
+				if !sO.addrInsUpd(addr.Address, addr.Name) {
 					sO.nNewAddrs += 1
-				} else if (len(pPrev.Name) == 0) && (len(addr.Name) > 0) {
-					pPrev.Name = addr.Name
 				}
 			}
 		}

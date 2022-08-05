@@ -31,12 +31,46 @@ func main() {
 
 	}()
 
-	// TODO: additional help on dir
+	// TODO: installation notes
+
+	const SZ_HELP_PREFIX = `
+maildir2addr
+------------
+
+  Scans maildir folders for e-mail addresses, outputs results in aerc-style
+  address-book-cmd format:
+
+    [E-MAIL1]\t[NAME1]\n
+    [E-MAIL2]\t[NAME2]\n
+    ...
+
+  The [E-MAIL] column is forced to lowercase in the output.
+
+  Defaults store data in the $HOME/.local/share/maildir2addr directory.
+
+  A file of exclude regexes can be specified with the -e option. One regexp per
+  line, each applied to the [E-MAIL] part only. If this file is specified but
+  does not exist, it will be created & populated with sane defaults.
+
+USAGE
+
+  maildir2addr [OPTION...] [MAILDIR_PATH...]
+
+OPTIONS
+
+`
+	// HELP MESSAGE
+	flag.Usage = func() {
+
+		fmt.Fprint(os.Stdout, SZ_HELP_PREFIX)
+		flag.PrintDefaults()
+		fmt.Fprint(os.Stdout, "\n")
+	}
 
 	var sO Opts
 
 	flag.BoolVar(&sO.IncludeSpamMsgs, "s", false, "process spam messages (where X-Spam-Flag == YES)")
-	flag.BoolVar(&sO.Verbose, "v", false, "verbose")
+	flag.BoolVar(&sO.Verbose, "v", false, "verbose, log details to STDERR")
 
 	var dbInFile, dbOutFile, szExcludesFile string
 	defaultDir := os.ExpandEnv("$HOME/.local/share/" + filepath.Base(os.Args[0]))
@@ -51,12 +85,12 @@ func main() {
 
 		sO.LogVerbose(
 			"1;93m",
-			"LOADING ADDRS",
+			"READING ADDRS",
 			dbInFile,
 		)
 
 		if E2 := sO.AddrsReadFromFile(dbInFile); E2 != nil {
-			E = errors.Wrap(E2, "load addrs "+dbInFile)
+			E = errors.Wrap(E2, "read addrs "+dbInFile)
 			return
 		}
 	}
@@ -95,7 +129,7 @@ func main() {
 		// LOAD EXCLUDE RULES
 		sO.LogVerbose(
 			"1;93m",
-			"LOADING EXCLUDE RULES",
+			"READING EXCLUDE RULES",
 			szExcludesFile,
 		)
 
@@ -105,6 +139,7 @@ func main() {
 	}
 
 	// WALKDIR FUNC: SCANS ADDRS FROM SELECTED FILES INTO DB
+	nScannedMsgs := 0
 	fnWalk := func(path string, de fs.DirEntry, err error) error {
 
 		if err != nil {
@@ -135,7 +170,7 @@ func main() {
 		}
 
 		// SCAN ADDRS
-		sO.nScannedMsgs += 1
+		nScannedMsgs += 1
 		if eMsg := sO.ScanMsgsForAddrs(absPath); eMsg != nil {
 
 			Flog(
@@ -160,30 +195,36 @@ func main() {
 				return
 			}
 		}
+	}
 
-		sO.LogVerbose(
+	// NOTE: running regardless of scan to purge
+	//       existing addresses with new exclusions
+	sO.AddrsPurgeExcluded()
+
+	if len(sArgs) > 0 {
+
+		Flog(
+			os.Stderr,
 			"1;92m",
 			"SCAN COMPLETE",
 			fmt.Sprintf(
-				"SCANNED %d ADDRS IN %d MSGS; %d NEW ADDRS FOUND (before exclusions)",
+				"SCANNED %d ADDRS IN %d MSGS; %d NEW ADDRS FOUND",
 				sO.nScannedAddrs,
-				sO.nScannedMsgs,
+				nScannedMsgs,
 				sO.nNewAddrs,
 			),
 		)
 	}
 
-	sO.AddrsPurgeExcluded()
-
 	// WRITE DB
 	sO.LogVerbose(
 		"1;93m",
-		"SAVING ADDRS",
+		"WRITING ADDRS",
 		dbOutFile,
 	)
 
 	if E2 := sO.AddrsWriteToFile(dbOutFile); E2 != nil {
-		E = errors.Wrap(E2, "save addrs "+dbOutFile)
+		E = errors.Wrap(E2, "write addrs "+dbOutFile)
 		return
 	}
 
