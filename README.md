@@ -1,6 +1,6 @@
 # maildir2addr
 
-Scans maildir folders for e-mail addresses, outputs results in aerc-style `address-book-cmd` format:
+Scans maildir folders for e-mail addresses, outputs unique results in aerc-style `address-book-cmd` format:
 
 ```
 [E-MAIL1]\t[NAME1]\n
@@ -14,7 +14,7 @@ Default settings store data in the `$HOME/.local/share/maildir2addr` directory.
 
 A file of exclude regexes can be specified with the `-e` option.
 One regexp per line, each applied to the `[E-MAIL]` part only.
-If this file is specified but does not exist, it will be created & populated with sane defaults.
+If this file is specified but does not exist, it will be created and populated with sane defaults.
 
 ## Installation
 
@@ -35,17 +35,27 @@ OPTIONS
 
   -e string
         address exclusion regex file [one per line]
-         (default "/home/jstewart/.local/share/maildir2addr/excludes.regexp")
+         (default "$HOME/.local/share/maildir2addr/excludes.regexp")
   -i string
         address database input file
-         (default "/home/jstewart/.local/share/maildir2addr/addrs.tsv")
+         (default "$HOME/.local/share/maildir2addr/addrs.tsv")
   -o string
         address database output file
-         (default "/home/jstewart/.local/share/maildir2addr/addrs.tsv")
+         (default "$HOME/.local/share/maildir2addr/addrs.tsv")
   -s    process spam messages (where X-Spam-Flag == YES)
   -v    verbose, log details to STDERR
 
 ```
+
+To create an address book in the default location:
+
+```sh
+maildir2addr -v /path/to/my/maildir
+```
+
+After issuing this command, a new tab-separated-values address file will appear at `$HOME/.local/share/maildir2addr/addrs.tsv`.
+
+This file is suitable for use with the address autocomplete feature of several TUI mail clients.
 
 ## `aerc` Integration
 
