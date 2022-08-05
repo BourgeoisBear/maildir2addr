@@ -42,10 +42,6 @@ func init() {
 
 /* -------------------------- UTILS -------------------------- */
 
-func norml(v string) string {
-	return strings.ToLower(strings.TrimSpace(v))
-}
-
 func FileExists(path string) bool {
 
 	_, eDir := os.Stat(path)
@@ -218,7 +214,7 @@ func (sO *Opts) addrInsUpd(addr, name string) bool {
 	}
 
 	// NORMALIZE
-	addr = norml(addr)
+	addr = strings.ToLower(strings.TrimSpace(addr))
 	name = strings.TrimSpace(name)
 
 	// UNQUOTE NAME
